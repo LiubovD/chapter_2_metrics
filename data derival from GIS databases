@@ -1,0 +1,539 @@
+import arcpy
+from arcpy import env
+from arcpy.sa import *
+arcpy.env.overwriteOutput = True
+
+## I. Calculating slope from DEM image:
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# outSlope = Slope("DEM_mosaic", "DEGREE")
+# outSlope.save("D:/Luba/project_deadtrees_factoring/MyProject6/outslope01.tif")
+
+# #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6"
+# #
+# # slope_bigger_20 = SetNull("outslope01.tif", 1, "Value < 20")
+# # slope_bigger_20.save("slope_20_3.tif")
+#
+# arcpy.conversion.RasterToPolygon("slope_20_3.tif", "slope_20_vector.shp", "NO_SIMPLIFY", "Value")
+
+# # 3. Intersect soils with slope raster
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring"
+
+# arcpy.analysis.Intersect(["slope_20_vector.shp", "tiles_filtered.shp"],
+#                          "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_slope")
+
+## 4. Add field with an area of every hydric soil polygon within tile
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# arcpy.management.CalculateGeometryAttributes("tiles_with_hydric", [["Area_hydric", "AREA_GEODESIC"]])
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring"
+
+## II. Project tiles so it would be in the same projection as DEM
+#
+# input_features = "tiles.shp"
+#
+# # output data
+# output_feature_class = "tiles_projected.shp"
+#
+# # create a spatial reference object for the output coordinate system
+# out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 19N')
+#
+# # run the tool
+# arcpy.Project_management(input_features, output_feature_class, out_coordinate_system)
+
+# #Since some polygons are not proper in terms of size we will filter them out
+#
+# inZoneData = "tiles_projected.shp"
+# filtered_polygons = "tiles_filtered.shp"
+# where_clause = "AREA >= 10000"
+#
+# arcpy.Select_analysis(inZoneData, filtered_polygons, where_clause)
+
+# Creating new ID field to copy FID values:
+
+# Set local variables
+# inFeatures = "tiles_filtered.shp"
+# fieldName = "ID"
+# fieldAlias = "ID_code"
+#
+# # Execute AddField twice for new field
+# arcpy.AddField_management(inFeatures, fieldName, "LONG",
+#                           field_alias=fieldAlias, field_is_nullable="NULLABLE")
+#
+# arcpy.CalculateField_management(inFeatures, fieldName, "!FID!", "PYTHON_9.3")
+
+
+# III. Calculating Aspect from DEM image
+#1. Calculating raster from DEM mosaic
+env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6"
+# outAspect = Aspect("DEM_mosaic")
+# outAspect.save("D:/Luba/project_deadtrees_factoring/outaspect01.img")
+
+# outInt = Int("outaspect01.img")
+# outInt.save("D:/Luba/project_deadtrees_factoring/aspect_int.img")
+
+#2. Extract by Mask all slopes steeper then 20 and choose aspect from 125 to 235
+# outExtractByMask = ExtractByMask("D:/Luba/project_deadtrees_factoring/aspect_int.img", "slope_20_3.tif")
+# outExtractByMask.save("aspect_steep_slopes.img")
+
+# aspect_south_steep = SetNull("outslope01.tif", 1, "Value < 125 Or Value > 235")
+# aspect_south_steep.save("south_slopes_steep.tif")
+
+#raster reclassified in arcgis to 2 categories - south facing slopes (125 to 235 degrees) and all the rest is NoDATA
+
+# # # 3. Convert raster to polygons - issues with layer
+# arcpy.conversion.RasterToPolygon("D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/south_slopes_steep", "south_slopes_steep.shp", "NO_SIMPLIFY")
+#
+# # ##4. Intersect slope with tiles
+#
+# arcpy.management.Dissolve("south_slopes_steep.shp", "south_slopes_steep_dissolved.shp", "FID", "", "SINGLE_PART")
+#
+# arcpy.analysis.Intersect(["south_slopes_steep_dissolved.shp", "tiles_filtered.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_south")
+
+
+## 5. Add field with an area of every slope polygon within tile
+#
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# arcpy.management.CalculateGeometryAttributes("tiles_with_south", [["Area_south", "AREA_GEODESIC"]])
+
+## 6. Add percentage field
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_south",
+#                            "ID_1", "Area_south")
+#
+# ## note that field name is max length of 10 symbols, which change names into Area_stones instead of Area_ston
+# arcpy.AddField_management("tiles_filtered.shp", "sth_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "sth_prcnt", "!Area_south!/100", "PYTHON_9.3")
+
+
+## IV. Trying to perform Zonal Statistics as Table for slope per grid cell of titles -
+#
+# inZoneData = "tiles_projected.shp"
+# zoneField = "ID"
+# inValueRaster = "MyProject6/outslope01"
+#
+# outTable = "zonalstat_slope_1.dbf"
+# outraster = "part_number_1_slope.shp"
+# where_clause = "ID < 13100"
+#
+# arcpy.Select_analysis(inZoneData, outraster, where_clause )
+# print(where_clause)
+# # # Execute ZonalStatisticsAsTable
+# aspect_zonal_stat = ZonalStatisticsAsTable(outraster, zoneField, inValueRaster, outTable, "DATA", "MEAN")
+#
+# print("number 1 part of dataset processed")titles_filtered.shp
+#
+# outTable = "zonalstat_slope_2.dbf"
+# outraster = "part_number_2_slope.shp"
+# where_clause = "(13000 <= ID and ID < 26000)"
+#
+# arcpy.Select_analysis(inZoneData, outraster, where_clause )
+# print(where_clause)
+# # # Execute ZonalStatisticsAsTable
+# aspect_zonal_stat = ZonalStatisticsAsTable(outraster, zoneField, inValueRaster, outTable, "DATA", "MEAN")
+
+# print("number 2 part of dataset processed")
+
+# outTable = "zonalstat_slope_3.dbf"
+# outraster = "part_number_3_slope.shp"
+# where_clause = "(26000 <= ID and ID < 39000)"
+
+# arcpy.Select_analysis(inZoneData, outraster, where_clause )
+# print(where_clause)
+# # # Execute ZonalStatisticsAsTable
+# aspect_zonal_stat = ZonalStatisticsAsTable(outraster, zoneField, inValueRaster, outTable, "DATA", "MEAN")
+
+# print("number 3 part of dataset processed")
+
+# outTable = "zonalstat_slope_4.dbf"
+# outraster = "part_number_4_slope.shp"
+# where_clause = "(39000 <= ID and ID < 52000)"
+#
+# arcpy.Select_analysis(inZoneData, outraster, where_clause )
+# print(where_clause)
+# # # Execute ZonalStatisticsAsTable
+# aspect_zonal_stat = ZonalStatisticsAsTable(outraster, zoneField, inValueRaster, outTable, "DATA", "MEAN")
+#
+# print("number 4 part of dataset processed")
+#
+# outTable = "zonalstat_slope_5.dbf"
+# outraster = "part_number_5_slope.shp"
+# where_clause = "(52000 <= ID and ID < 65000)"
+#
+# arcpy.Select_analysis(inZoneData, outraster, where_clause )
+# print(where_clause)
+# # # Execute ZonalStatisticsAsTable
+# aspect_zonal_stat = ZonalStatisticsAsTable(outraster, zoneField, inValueRaster, outTable, "DATA", "MEAN")
+#
+# print("number 5 part of dataset processed")
+#
+# outTable = "zonalstat_slope_6.dbf"
+# outraster = "part_number_6_slope.shp"
+# where_clause = "65000 <= ID"
+#
+# arcpy.Select_analysis(inZoneData, outraster, where_clause )
+# print(where_clause)
+# # # Execute ZonalStatisticsAsTable
+# aspect_zonal_stat = ZonalStatisticsAsTable(outraster, zoneField, inValueRaster, outTable, "DATA", "MEAN")
+#
+# print("number 6 part of dataset processed")
+
+
+## V. For TPI calculation:
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# outFocalStat = FocalStatistics("DEM_mosaic", 'focalstat')
+# outFocalStat.save("focalstat")
+#
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# outTPI = Minus ("DEM_mosaic", "focalstat")
+# outTPI.save("TPI_index")
+
+
+# VI. For calculating hydric soil
+
+# 1. Project tiles so it would be in the same projection as DEM
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring/soils"
+#
+# input_features = "Soils_.shp"
+#
+# # output data
+# output_feature_class = "soils_projected.shp"
+#
+# # create a spatial reference object for the output coordinate system
+# out_coordinate_system = arcpy.SpatialReference('NAD 1983 UTM Zone 19N')
+#
+# # run the tool
+# arcpy.Project_management(input_features, output_feature_class, out_coordinate_system)
+
+## 2. Create layer of hydric soils
+#
+# env.workspace = "D:/Luba/project_deadtrees_factoring/soils"
+#
+# inZoneData = "soils_projected.shp"
+# outraster = "hydric_soils.shp"
+# where_clause = "HYDRIC = 'Y'"
+# arcpy.Select_analysis(inZoneData, outraster, where_clause)
+#
+# # 3. Intersect soils with tiles
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring"
+#
+# arcpy.management.Dissolve("soils/hydric_soils.shp", "soils/hydric_soils_dissolved.shp", "FID", "", "SINGLE_PART")
+
+# arcpy.analysis.Intersect(["soils/hydric_soils.shp", "tiles_filtered.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_hydric")
+
+
+## 4. Add field with an area of every hydric soil polygon within tile
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# arcpy.management.CalculateGeometryAttributes("tiles_with_hydric", [["Area_hydric", "AREA_GEODESIC"]])
+
+
+## VII. For calculating excessively drainaged soils:
+
+## 1. Create layer of too drained soils
+# #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/soils"
+#
+# inZoneData = "soils_projected.shp"
+# outraster = "drained_soils.shp"
+# where_clause = "DRAINAGE = 'ED' OR DRAINAGE = 'SED'"
+# arcpy.Select_analysis(inZoneData, outraster, where_clause)
+#
+# ## 3. Merge polygons of drainage and intersect soils with tiles
+#
+#
+# arcpy.management.Dissolve("soils/drained_soils.shp", "soils/drained_soils_dissolved.shp", "FID", "", "SINGLE_PART")
+# arcpy.analysis.Intersect(["tiles_filtered.shp", "soils/drained_soils_dissolved.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_drained")
+#
+#
+# # 4. Add field with an area of every hydric soil polygon within tile
+#
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# arcpy.management.CalculateGeometryAttributes("tiles_with_drained", [["Area_drained", "AREA_GEODESIC"]])
+# # #
+
+## VIII. For calculating soils with bedrock restrictive layer:
+## 1. Create layer of too drained soils
+# #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/soils"
+# #
+# inZoneData = "soils_projected.shp"
+# outraster = "bedrock_soils.shp"
+# where_clause = "RES_TYPE = 'Bedrock'"
+# arcpy.Select_analysis(inZoneData, outraster, where_clause)
+#
+# # 3. Merge polygons of drainage and intersect soils with tiles
+# #
+#
+# arcpy.management.Dissolve("soils/bedrock_soils.shp", "soils/bedrock_soils_dissolved.shp", "FID", "", "SINGLE_PART")
+# arcpy.analysis.Intersect(["tiles_filtered.shp", "soils/bedrock_soils_dissolved.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_bedrock")
+# #
+#
+# #  4. Add field with an area of every hydric soil polygon within tile
+# #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# arcpy.management.CalculateGeometryAttributes("tiles_with_bedrock", [["Area_bedrock", "AREA_GEODESIC"]])
+
+## IX. For calculating soils with densic restrictive layer:
+## 1. Create layer of too drained soils
+# #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/soils"
+#
+# inZoneData = "soils_projected.shp"
+# outraster = "densic_soils.shp"
+# where_clause = "RES_TYPE = 'Densic'"
+# arcpy.Select_analysis(inZoneData, outraster, where_clause)
+#
+# # 3. Merge polygons of drainage and intersect soils with tiles
+#
+# arcpy.management.Dissolve("soils/densic_soils.shp", "soils/densic_soils_dissolved.shp", "RES_TYPE", "", "SINGLE_PART")
+# arcpy.analysis.Intersect(["tiles_filtered.shp", "soils/densic_soils_dissolved.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_densic")
+#
+#
+# # # 4. Add field with an area of every hydric soil polygon within tile
+# # #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# arcpy.management.CalculateGeometryAttributes("tiles_with_densic", [["Area_densic", "AREA_GEODESIC"]])
+
+## X. Export erosion, ord_symbol and stony information to soils_projected.shp
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+# arcpy.management.JoinField("D:/Luba/project_deadtrees_factoring/soils/soils_projected.shp", "SOIL_NAME", "soil_parameters_additional", "SOIL_NAME", ["EROSION", "STONE", "ORD_SYMB"])
+
+## ## XI. For calculating stoniness in soils:
+## 1. Create layer of too drained soils
+# # #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/soils"
+# # #
+# # inZoneData = "soils_projected.shp"
+# # outraster = "stoned_soils.shp"
+# # where_clause = "STONE = 3"
+# # arcpy.Select_analysis(inZoneData, outraster, where_clause)
+# # #
+# # # # 3. Merge polygons of stoninnes and intersect soils with tiles
+# # #
+# arcpy.management.Dissolve("soils/stoned_soils.shp", "soils/stoned_soils_dissolved.shp", "FID", "", "SINGLE_PART")
+# arcpy.analysis.Intersect(["tiles_filtered.shp", "soils/stoned_soils_dissolved.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_stones")
+#
+# # #  4. Add area fields for every parameter (hydric, drained etc)
+# # # #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+
+# arcpy.management.CalculateGeometryAttributes("tiles_with_stones", [["Area_stones", "AREA_GEODESIC"]])
+
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_hydric",
+#                            "ID", "Area_hydric")
+
+# ## XI. For calculating ord_symb in soils:
+
+# 1. Create layer of soils with high ord symbol
+#
+# env.workspace = "D:/Luba/project_deadtrees_factoring/soils"
+#
+# inZoneData = "soils_projected.shp"
+# outraster = "ord_soils.shp"
+# where_clause = "ORD_SYMB = '5w' OR ORD_SYMB = '5x' OR ORD_SYMB = '5o' OR ORD_SYMB = '5s' OR ORD_SYMB = '5d' OR ORD_SYMB = '5r'"
+# arcpy.Select_analysis(inZoneData, outraster, where_clause)
+#
+# # # # 3. Merge polygons of ord values and intersect soils with tiles
+# # #
+# arcpy.management.Dissolve("soils/ord_soils.shp", "soils/ord_soils_dissolved.shp", "FID", "", "SINGLE_PART")
+# arcpy.analysis.Intersect(["tiles_filtered.shp", "soils/ord_soils_dissolved.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_ord")
+#
+# # #  4. Add area fields for every parameter (hydric, drained etc)
+# # # #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+#
+# arcpy.management.CalculateGeometryAttributes("tiles_with_ord", [["Area_ord", "AREA_GEODESIC"]])
+#
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_ord",
+#                            "ID", "Area_ord")
+
+ ## XII. For calculating EROSION in soils:
+# arcpy.management.Dissolve("soils/eros_soils.shp", "soils/eros_soils_dissolved.shp", "FID", "", "SINGLE_PART")
+# arcpy.analysis.Intersect(["tiles_filtered.shp", "soils/eros_soils_dissolved.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_eros")
+
+
+##1. Create layer of soils with erodability higher then 0.4
+
+# env.workspace = "D:/Luba/project_deadtrees_factoring/soils"
+#
+# inZoneData = "soils_projected.shp"
+# outraster = "eros_soils.shp"
+# where_clause = "EROSION > 0.4"
+# arcpy.Select_analysis(inZoneData, outraster, where_clause)
+#
+# # # # 3. Merge polygons of ord values and intersect soils with tiles
+# # #
+
+
+# #  4. Add area fields for every parameter (hydric, drained etc)
+# # # #
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+#
+# arcpy.management.CalculateGeometryAttributes("tiles_with_eros", [["Area_eros", "AREA_GEODESIC"]])
+#
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_eros",
+#                            "ID", "Area_eros")
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+
+# arcpy.AddField_management("tiles_filtered.shp", "eros_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "eros_prcnt", "!Area_eros!/100", "PYTHON_9.3")
+
+## XIII. ADD AREA FIELD TO MAIN TABLE "titles_filtered.shp"
+# ## note that field name is max length of 10 symbols, which change names into Area_hydric instead of Area_hydric
+# arcpy.AddField_management("tiles_filtered.shp", "hydr_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "hydr_prcnt", "!Area_hydri!/100", "PYTHON_9.3")
+
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_drained",
+#                            "ID", "Area_drained")
+#
+# ## note that field name is max length of 10 symbols, which change names into Area_drainage instead of Area_drain
+# arcpy.AddField_management("tiles_filtered.shp", "drai_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "drai_prcnt", "!Area_drain!/100", "PYTHON_9.3")
+#
+# # arcpy.management.JoinField("tiles_filtered.shp", "ID",
+# #                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_bedrock",
+# #                            "ID", "Area_bedrock")
+
+# ## note that field name is max length of 10 symbols, which change names into Area_bedrock instead of Area_bedro
+# arcpy.AddField_management("tiles_filtered.shp", "bedr_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "bedr_prcnt", "!Area_bedro!/100", "PYTHON_9.3")
+#
+# #
+# # arcpy.CalculateField_management(inFeatures, fieldName, "!FID!", "PYTHON_9.3")
+# # arcpy.management.JoinField("tiles_filtered.shp", "ID",
+# #                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_densic",
+# #                            "ID", "Area_densic")
+
+# ## note that field name is max length of 10 symbols, which change names into Area_densic instead of Area_densi
+# arcpy.AddField_management("tiles_filtered.shp", "dens_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "dens_prcnt", "!Area_densi!/100", "PYTHON_9.3")
+#
+# # arcpy.management.JoinField("tiles_filtered.shp", "ID",
+# #                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_stones",
+# #                            "ID", "Area_stones")
+
+# ## note that field name is max length of 10 symbols, which change names into Area_stones instead of Area_ston
+# arcpy.AddField_management("tiles_filtered.shp", "ston_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "ston_prcnt", "!Area_stone!/100", "PYTHON_9.3")
+
+
+# ## note that field name is max length of 10 symbols, which change names into Area_ord instead of Area_ord
+# arcpy.AddField_management("tiles_filtered.shp", "ord_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "ord_prcnt", "!Area_ord!/100", "PYTHON_9.3")
+#
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_ord",
+#                            "ID", "Area_ord")
+
+## add value of slope
+#
+# env.workspace = "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb"
+#
+# arcpy.management.CalculateGeometryAttributes("tiles_with_slope", [["Area_GEO", "AREA_GEODESIC"]], "METERS", "SQUARE_METERS")
+#
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_slope",
+#                            "ID_1", "Area_GEO")
+#
+# arcpy.AddField_management("tiles_filtered.shp", "slpe_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "slpe_prcnt", "!Area_GEO!/100", "PYTHON_9.3")
+
+# To derive information from Land cover and calculate
+# state_boundary = "D:\Luba\project_deadtrees_factoring\state_boundary\State_Boundary__1997_.shp"
+# lc_2016 = "D:\Luba\project_deadtrees_factoring\landcover_2016\conus_2016_ccap_landcover_20200311.tif"
+#
+# outExtractByMask = ExtractByMask(lc_2016, state_boundary)
+# outExtractByMask.save("D:\Luba\project_deadtrees_factoring\landcover_2016\lc_2016_ri.img")
+
+## applied symbology from a file in ArcGIS
+# in_raster = "D:/Luba/project_deadtrees_factoring/landcover_2016/lc_2016_ri.img"
+
+#
+# vector_file = "D:/Luba/project_deadtrees_factoring/landcover_2016/lc_2016_vector.shp"
+# # arcpy.conversion.RasterToPolygon(in_raster, vector_file, "NO_SIMPLIFY", "Value")
+#
+# evergreen_clause = "gridcode = 10" # evergreen forest according to C-CAP-Legend.txt
+# evergreen = "evergreen.shp"
+# arcpy.Select_analysis(vector_file, evergreen, evergreen_clause)
+
+# # ##Intersect evergreen with tiles
+# #
+# arcpy.management.Dissolve("evergreen.shp", "evergreen_dissolved.shp", "FID", "", "SINGLE_PART")
+# #
+# arcpy.analysis.Intersect(["evergreen_dissolved.shp", "tiles_filtered.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_evergreen")
+#
+# arcpy.management.CalculateGeometryAttributes("D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_evergreen",
+#                                              [["Area_evgr", "AREA_GEODESIC"]])
+#
+# #for some reason in tiles_with_evergreen is field ID_1 instead of ID
+#
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_evergreen",
+#                            "ID_1", "Area_evgr")
+#
+# arcpy.AddField_management("tiles_filtered.shp", "prcnt_evgr", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "prcnt_evgr", "!Area_evgr!/100", "PYTHON_9.3")
+
+# deciduous_clause = "gridcode = 9" # deciduous according to C-CAP-Legend.txt
+# deciduous = "deciduous.shp"
+# arcpy.Select_analysis(vector_file, deciduous, deciduous_clause)
+
+# arcpy.management.Dissolve("deciduous.shp", "deciduous_dissolved.shp", "FID", "", "SINGLE_PART")
+# # #
+# arcpy.analysis.Intersect(["deciduous_dissolved.shp", "tiles_filtered.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_deciduous")
+#
+# arcpy.management.CalculateGeometryAttributes("D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_deciduous",
+#                                              [["Area_dcd", "AREA_GEODESIC"]])
+#
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_deciduous",
+#                            "ID_1", "Area_dcd")
+#
+# arcpy.AddField_management("tiles_filtered.shp", "prc_dcd", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "prc_dcd", "!Area_dcd!/100", "PYTHON_9.3")
+
+# dev_clause = "gridcode=2 OR gridcode=3 OR gridcode=4 OR gridcode=5"
+# developed = "developed.shp"
+# arcpy.Select_analysis(vector_file, developed, dev_clause)
+
+# Creating a buffer around developed object
+# arcpy.analysis.Buffer("developed.shp", "buffered_developed.shp", "50 Meters", "", "", "ALL")
+
+# arcpy.analysis.Intersect(["buffered_developed.shp", "tiles_filtered.shp"], "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_developed")
+#
+# arcpy.management.CalculateGeometryAttributes("D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_developed",
+#                                              [["Area_dev", "AREA_GEODESIC"]])
+#
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_developed",
+#                            "ID_1", "Area_dev")
+#
+# arcpy.AddField_management("tiles_filtered.shp", "dev_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "dev_prcnt", "!Area_dev!/100", "PYTHON_9.3")
+
+
+## fragmented forest
+
+# arcpy.analysis.Intersect([r"D:\Luba\project_deadtrees_factoring\MyProject6\MyProject6.gdb\fragmented_forest_vector_diss", "tiles_filtered.shp"],
+#                          "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_fragfor")
+#
+# arcpy.management.CalculateGeometryAttributes("D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_fragfor",
+#                                              [["Area_ff", "AREA_GEODESIC"]])
+#
+# arcpy.management.JoinField("tiles_filtered.shp", "ID",
+#                            "D:/Luba/project_deadtrees_factoring/MyProject6/MyProject6.gdb/tiles_with_fragfor",
+#                            "ID", "Area_ff")
+#
+# arcpy.AddField_management("tiles_filtered.shp", "ff_prcnt", "LONG","", field_is_nullable="NULLABLE")
+# arcpy.CalculateField_management("tiles_filtered.shp", "ff_prcnt", "!Area_ff!/100", "PYTHON_9.3")
