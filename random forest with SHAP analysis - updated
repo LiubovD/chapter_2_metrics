@@ -71,11 +71,11 @@ clr_rf = clf_rf.fit(factors_train, mortality_train)
 mortality_pred = clf_rf.predict(factors_test)
 
 
-#
-# explainer = shap.Explainer(clr_rf)
-# shap_values = explainer.shap_values(factors)
 
-# shap.summary_plot(shap_values, factors)
+explainer = shap.Explainer(clr_rf)
+shap_values = explainer.shap_values(factors)
+
+shap.summary_plot(shap_values, factors)
 
 
 def test_accuracy():
@@ -151,13 +151,13 @@ def calculate_factor_importance():
 #         shap.plots.scatter(shap_values1[feature_id])
 
 
+
 # individaul plot
 explainer = shap.Explainer(clr_rf)
 shap_values1 = explainer(factors_train)
 shap_values2 = copy.deepcopy(shap_values1)
 shap_values2.values = shap_values2.values[:, :, 1]
 shap_values2.base_values = shap_values2.base_values[:, 1]
-shap.summary_plot(shap_values2, factors, plot_type = 'text')
 shap.plots.scatter(shap_values2[:, 'Canopy cover'])
 
 # # shap.plots.beeswarm(shap_values2)
