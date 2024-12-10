@@ -157,7 +157,7 @@ shap_values1 = explainer(factors_train)
 shap_values2 = copy.deepcopy(shap_values1)
 shap_values2.values = shap_values2.values[:, :, 1]
 shap_values2.base_values = shap_values2.base_values[:, 1]
-# shap.summary_plot(shap_values2, x, plot_type = 'text')
+shap.summary_plot(shap_values2, x, plot_type = 'text')
 shap.plots.scatter(shap_values2[:, 'Canopy cover'])
 
 # # shap.plots.beeswarm(shap_values2)
