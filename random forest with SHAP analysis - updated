@@ -1,0 +1,183 @@
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import cross_val_score
+import shap
+import copy
+from sklearn.metrics import classification_report
+import os
+
+# get data
+df = pd.read_csv("dataset_11_03.csv")
+
+column_names = {'decid_prcnt': 'Deciduous %', 'dist_lake': 'Lake proximity', 'drough': 'Drought index',
+                'dist_dev': 'Urban proximity', 'FRCI_CC': 'Canopy cover', 'dist_coast': 'Coast proximity',
+                'evergr_prcnt': 'Evergreen %', 'dex_index': 'Defoliation index'}
+
+df = df.rename(columns=column_names)
+df_upd = df.fillna(0)
+print(df)
+
+# create our sklearn data
+
+factors = df_upd.drop(['OID_', 'ID_upd', 'TrMrt2ct', 'TrMrt3ct', 'TreeMort_3', 'cnsrv_prcn', 'prcnt_forest',
+                       # omit classification items
+                       'def_total', 'defol_1yr', 'defol_2yr',  # omit dublicates
+                       'pitchpine_prcnt', 'hardwood_prcnt', 'bedrockdep_prcnt', 'defol_3yr'
+                       # omit zero-importance variables
+                          , 'oak_prcnt',
+                       'ord_prcnt',
+                       'groundwater_prcnt',
+                       'fldplnfr_prcnt', 'hemlock_prcnt', 'maritime_prcnt',
+                       'dcd_pr_n', 'sand_prcnt', 'ruderalfrst_prcnt', 'erosion_prcnt',
+                       'wetlands_prcnt', 'drained_prcnt', 'sthslp_prcnt',
+                       'swamp_prcnt', 'plantation_prcnt', 'bedrock_prcnt', 'stoned_prcnt',
+                       'hydric_prcnt', 'densc_prcnt', 'steep_prcnt', 'TPI_bot', 'TPI_top',
+                       'Deciduous %', 'mixed_prcnt', 'till_prcnt', 'outwash_prcnt'
+
+                       ], axis=1)
+
+mortality = df_upd['TrMrt3ct']
+
+factors_train, factors_test, mortality_train, mortality_test = train_test_split(factors, mortality, test_size=0.3)
+
+clf_rf = RandomForestClassifier(n_estimators=100, criterion='gini', min_samples_leaf=3, random_state=1)
+
+
+def evaluate_the_best_model(some_params):
+    param_grid = {
+        'n_estimators': [1000, 500, 1500],
+        'max_features': ['auto', 'sqrt', 'log2'],
+        'max_depth': [8, 10, 12],
+        'criterion': ['gini', 'entropy']
+    }
+    grid = GridSearchCV(clf_rf, param_grid, cv=5)
+    grid.fit(factors_train, mortality_train)
+    print("Grid Search: best parameters: {}".format(grid.best_params_))
+
+    best_model = grid.best_estimator_
+    predict_y = best_model.predict(factors_test)
+    acc = accuracy_score(factors_train, predict_y)
+    lb, ub = classification_confint(acc, factors.shape[0])
+    print("Accuracy: {:3.2f} ({:3.2f},{:3.2f})".format(acc, lb, ub))
+
+
+clr_rf = clf_rf.fit(factors_train, mortality_train)
+mortality_pred = clf_rf.predict(factors_test)
+
+
+#
+# explainer = shap.Explainer(clr_rf)
+# shap_values = explainer.shap_values(factors)
+
+# shap.summary_plot(shap_values, factors)
+
+
+def test_accuracy():
+    from sklearn.metrics import cohen_kappa_score
+
+    kappa = cohen_kappa_score(mortality_test, mortality_pred)
+    print('kappa is ')
+    print(kappa)
+    report = classification_report(mortality_test, mortality_pred)
+    print('printing classification report ')
+    print(report)
+    ac = accuracy_score(mortality_test, clf_rf.predict(factors_test))
+    print('Accuracy is: ', ac)
+    cm = confusion_matrix(mortality_test, clf_rf.predict(factors_test))
+    sns.heatmap(cm, annot=True, fmt="d")
+    plt.show()
+
+    # fig, axes = plt.subplots(10, 10, figsize=(8, 8),
+    #                          subplot_kw={'xticks':[], 'yticks':[]},
+    #                          gridspec_kw=dict(hspace=0.1, wspace=0.1))
+
+
+def cross_validation(some_params):
+    # do the 5-fold cross validation
+    scores = cross_val_score(clr_rf, factors, mortality, cv=5)
+    print("Fold Accuracies: {}".format(scores))
+    print("XV Accuracy: {:3.2f}".format(scores.mean()))
+
+    # import seaborn as sns
+    # sns.set()
+    # sns.pairplot(df, hue='TrMrt_2ct', height=3, vars=['def_index', 'CC_FRCP_p'])
+
+    # Train results: evaluate the model on the testing set of data
+    mortality_train_model = clf_rf.predict(factors_train)
+    print("Train Accuracy: {:3.2f}".format(accuracy_score(mortality_train, mortality_train_model)))
+
+    # Test results: evaluate the model on the testing set of data
+    mortality_test_model = clf_rf.predict(factors_test)
+    print("Test Accuracy: {:3.2f}".format(accuracy_score(mortality_test, mortality_test_model)))
+
+
+def calculate_factor_importance():
+    # get importance
+    importance = clf_rf.feature_importances_
+    feature_names = factors_train.columns
+    feature_names_importance = dict()
+
+    for i, v in enumerate(importance):
+        feature_names_importance.update({feature_names[i]: v})
+        # print('Feature: %0d, Score %.5f' % (i,v))
+    print(feature_names_importance)
+    print('/n')
+
+    sorted_list_var = sorted(feature_names_importance.items(), key=lambda item: item[1], reverse=True)
+    for i, v in sorted_list_var:
+        print(i, v)
+
+
+# # shap graph
+#
+# explainer = shap.Explainer(clr_rf)
+# shap_values = explainer(factors_train)
+# print(shap_values)
+# for class_id in range(3):
+#     shap_values1 = copy.deepcopy(shap_values)
+#     shap_values1.values = shap_values1.values[:, :, class_id]
+#     shap_values1.base_values = shap_values1.base_values[:, class_id]
+#     for feature_id in range(3, 7):
+#         print("shap_values2: ", shap_values1.values)
+#         print("shap_values2[:]", shap_values1.values[0])
+#         # print(f"Data for feature {feature_id}:", shap_values2[feature_id, :])
+#         plt.figure()
+#         shap.plots.scatter(shap_values1[feature_id])
+
+
+# individaul plot
+explainer = shap.Explainer(clr_rf)
+shap_values1 = explainer(factors_train)
+shap_values2 = copy.deepcopy(shap_values1)
+shap_values2.values = shap_values2.values[:, :, 1]
+shap_values2.base_values = shap_values2.base_values[:, 1]
+# shap.summary_plot(shap_values2, x, plot_type = 'text')
+shap.plots.scatter(shap_values2[:, 'Canopy cover'])
+
+# # shap.plots.beeswarm(shap_values2)
+# shap.plots.scatter(shap_values[:, 'Urban proximity'])
+
+# df_lbl = pd.read_csv("dataset_11_03_nolabel.csv")
+# df_lbl_upd = df_lbl. fillna(0)
+#
+# x_new = df_lbl_upd.drop(['OID_', 'ID_upd', 'TrMrt2ct', 'TrMrt3ct' , 'TreeMort_3', 'cnsrv_prcn', 'prcnt_forest', #omit classification items
+#              'def_total', 'defol_1yr', 'defol_2yr',  #omit dublicates
+#             'pitchpine_prcnt', 'hardwood_prcnt',  'sand_prcnt', 'bedrockdep_prcnt', 'defol_3yr' #omit zero-importance variables
+#              , 'oak_prcnt',
+#              'ord_prcnt',
+#              'groundwater_prcnt'
+#              ],axis=1)
+#
+# y_result = clf_rf.predict(x_new)
+# print(y_result)
+# print(min(y_result))
+# print(max(y_result))
+# df_lbl_upd['TrMrt3ct']=y_result
+# print(df_lbl_upd)
+# df_lbl_upd.to_csv('dataframe_results_2ct_02_19.csv', index=False)
