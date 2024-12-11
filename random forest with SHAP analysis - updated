@@ -71,13 +71,6 @@ clr_rf = clf_rf.fit(factors_train, mortality_train)
 mortality_pred = clf_rf.predict(factors_test)
 
 
-
-explainer = shap.Explainer(clr_rf)
-shap_values = explainer.shap_values(factors)
-
-shap.summary_plot(shap_values, factors)
-
-
 def test_accuracy():
     from sklearn.metrics import cohen_kappa_score
 
@@ -134,7 +127,7 @@ def calculate_factor_importance():
         print(i, v)
 
 
-# # shap graph
+# # shap graph loop
 #
 # explainer = shap.Explainer(clr_rf)
 # shap_values = explainer(factors_train)
@@ -150,29 +143,50 @@ def calculate_factor_importance():
 #         plt.figure()
 #         shap.plots.scatter(shap_values1[feature_id])
 
-
-
 # individaul plot
-explainer = shap.Explainer(clr_rf)
-shap_values1 = explainer(factors_train)
-shap_values2 = copy.deepcopy(shap_values1)
-shap_values2.values = shap_values2.values[:, :, 1]
-shap_values2.base_values = shap_values2.base_values[:, 1]
-shap.plots.scatter(shap_values2[:, 'Canopy cover'])
+# Create a SHAP explainer
+explainer = shap.TreeExplainer(clf_rf)
+
+# Calculate SHAP values for the test set
+shap_values = explainer.shap_values(factors_test)
+
+# Plot SHAP values (scatter plot for each feature)
+# For binary classification (two classes), shap_values is a list. We'll plot the SHAP values for the positive class.
+shap.summary_plot(shap_values[1], factors_test, plot_type="dot", feature_names=factors.columns)
+
+# Choose a feature to plot (e.g., 'Deciduous %')
+features = ['Lake proximity', 'Drought index',
+            'Urban proximity', 'Canopy cover', 'Coast proximity',
+            'Evergreen %', 'Defoliation index']
+
+# Iterate over classes
+for class_idx, class_name in enumerate(['Class 0', 'Class 1', 'Class 2']):
+    print(f"Generating plots for {class_name}...")
+
+    # Iterate over features
+    for feature in features:
+        if feature not in factors.columns:
+            print(f"Feature '{feature}' not found in factors DataFrame. Skipping...")
+            continue
+
+        # Get the feature index
+        feature_idx = factors.columns.get_loc(feature)
+
+        # Extract SHAP values for this class and feature
+        shap_feature_values = shap_values[class_idx][:, feature_idx]
+        feature_values = factors_test[feature]
+
+        # Create scatter plot
+        plt.figure(figsize=(10, 6))
+        plt.scatter(feature_values, shap_feature_values, alpha=0.5, color='b')
+        plt.title(f'SHAP Scatter Plot for {feature} - {class_name}')
+        plt.xlabel(f'{feature} (Feature Value)')
+        plt.ylabel('SHAP Value')
+        plt.grid(True)
+        plt.show()
 
 # # shap.plots.beeswarm(shap_values2)
-# shap.plots.scatter(shap_values[:, 'Urban proximity'])
 
-# df_lbl = pd.read_csv("dataset_11_03_nolabel.csv")
-# df_lbl_upd = df_lbl. fillna(0)
-#
-# x_new = df_lbl_upd.drop(['OID_', 'ID_upd', 'TrMrt2ct', 'TrMrt3ct' , 'TreeMort_3', 'cnsrv_prcn', 'prcnt_forest', #omit classification items
-#              'def_total', 'defol_1yr', 'defol_2yr',  #omit dublicates
-#             'pitchpine_prcnt', 'hardwood_prcnt',  'sand_prcnt', 'bedrockdep_prcnt', 'defol_3yr' #omit zero-importance variables
-#              , 'oak_prcnt',
-#              'ord_prcnt',
-#              'groundwater_prcnt'
-#              ],axis=1)
 #
 # y_result = clf_rf.predict(x_new)
 # print(y_result)
